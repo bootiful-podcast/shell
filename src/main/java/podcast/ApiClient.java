@@ -43,8 +43,8 @@ class ApiClient {
 	public static void main(String[] args) {
 		var rt = new RestTemplateBuilder().build();
 		ApiClient apiClient = new ApiClient(
-			"http://localhost:8080/production?id=" + UUID.randomUUID().toString(),
-			rt);
+				"http://localhost:8080/production?id=" + UUID.randomUUID().toString(),
+				rt);
 		var file = new File("/Users/joshlong/Desktop/sample-package.zip");
 		var sent = apiClient.publishPackage(file);
 		log.info("sent: " + sent);
