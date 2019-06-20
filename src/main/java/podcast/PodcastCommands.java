@@ -69,7 +69,7 @@ class PodcastCommands {
 		return (f != null && Arrays.asList("wav", "mp3").contains(extensionFor(f)));
 	}
 
-	@ShellMethod(value = "publish" , key = "publish")
+	@ShellMethod(value = "publish", key = "publish")
 	public void publishForProcessing() {
 		// todo this is where we would publish the pacakge to the integration endpoint
 		// todo make sure to send a checksum as well
