@@ -69,16 +69,17 @@ class PodcastCommands {
 		return (f != null && Arrays.asList("wav", "mp3").contains(extensionFor(f)));
 	}
 
-	@ShellMethod(value = "publish")
+	@ShellMethod(value = "publish" , key = "publish")
 	public void publishForProcessing() {
 		// todo this is where we would publish the pacakge to the integration endpoint
 		// todo make sure to send a checksum as well
 		Assert.notNull(this.archive, "the archive must not be null");
-		Assert.isTrue(apiClient.publishPackage(this.archive),
+		var publishResponse = apiClient.publishPackage(this.archive);
+		Assert.isTrue(publishResponse.isPublished(),
 				"could not publish the package archive");
 	}
 
-	@ShellMethod(value = "package")
+	@ShellMethod(value = "package", key = "package")
 	public void createPackage() {
 		var ext = extensionFor(this.intro);
 
