@@ -5,7 +5,6 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.shell.Availability;
-import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
 import org.springframework.shell.standard.ShellMethodAvailability;
 import org.springframework.shell.standard.ShellOption;
@@ -14,21 +13,29 @@ import org.springframework.util.Assert;
 import java.io.File;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static podcast.FileUtils.extensionFor;
 
 @Log4j2
-@ShellComponent
+// @ShellComponent
+@Deprecated
 @RequiredArgsConstructor
-class PodcastCommands {
+class OldPodcastCommands {
 
 	private static final String MEDIA_ARG = "--media";
 
-	private static final String DISCOVERY_ARG = "--description";
+	private static final String DESCRIPTION_ARG = "--description";
+
+	private static final String INTERVIEW_ARG = "--interview-media";
+
+	private static final String INTRODUCTION_ARG = "--intro-media";
 
 	private final ApplicationEventPublisher publisher;
 
 	private final ThreadLocal<Podcast> podcast = new ThreadLocal<>();
+
+	private final AtomicBoolean packaged = new AtomicBoolean();
 
 	private File intro, interview, archive;
 
@@ -46,9 +53,9 @@ class PodcastCommands {
 
 	@ShellMethodAvailability("newPodcastAvailabilityCheck")
 	@ShellMethod(value = "new podcast")
-	public void newPodcast(@ShellOption(DISCOVERY_ARG) String description) {
+	public void newPodcast(@ShellOption(DESCRIPTION_ARG) String description) {
 		this.podcast.set(new Podcast(description, UUID.randomUUID().toString()));
-		this.publisher.publishEvent(new PodcastStartedEvent(getPodcast()));
+		this.publisher.publishEvent(new PodcastCreatedEvent(getPodcast()));
 	}
 
 	@ShellMethodAvailability(value = "addMediaAvailabilityCheck")
@@ -70,23 +77,40 @@ class PodcastCommands {
 	}
 
 	@ShellMethod(value = "publish", key = "publish")
-	public void publishForProcessing() {
-		// todo this is where we would publish the pacakge to the integration endpoint
-		// todo make sure to send a checksum as well
+	public void publish() {
+		if (!this.packaged.get()) {
+			this.createPackage();
+		}
 		Assert.notNull(this.archive, "the archive must not be null");
-		var publishResponse = apiClient.publishPackage(this.archive);
+		var uid = UUID.randomUUID().toString();
+		var publishResponse = this.apiClient.publish(uid, this.archive);
 		Assert.isTrue(publishResponse.isPublished(),
 				"could not publish the package archive");
+		publishResponse.checkProductionStatus().thenAccept(uri -> {
+			log.info("the URI is " + uri.toString());
+			publisher.publishEvent(new ProductionFinishedEvent(uri));
+		});
+		publisher.publishEvent(new ProductionStartedEvent(publishResponse));
+	}
+
+	@ShellMethod(value = "rush", key = "rush")
+	public void rush(@ShellOption(DESCRIPTION_ARG) String description,
+			@ShellOption(INTERVIEW_ARG) File interview,
+			@ShellOption(INTRODUCTION_ARG) File introduction) {
+
+		this.newPodcast(description);
+		this.addInterviewMedia(interview);
+		this.addIntroductionMedia(introduction);
+		this.publish();
 	}
 
 	@ShellMethod(value = "package", key = "package")
 	public void createPackage() {
 		var ext = extensionFor(this.intro);
-
 		Assert.notNull(this.interview, "the interview file must be specified");
 		Assert.notNull(this.intro, "the introduction file must be specified");
-
-		var aPackage = this.getPodcast().addMedia(ext, this.intro, this.interview)
+		var aPackage = this.getPodcast()//
+				.addMedia(ext, this.intro, this.interview)//
 				.createPackage();
 
 		publisher.publishEvent(new PackageCreatedEvent(aPackage));
@@ -95,7 +119,8 @@ class PodcastCommands {
 	@EventListener
 	public void packageCreated(PackageCreatedEvent event) {
 		this.archive = event.getSource();
-		System.out.println("The podcast archive has been written to "
+		this.packaged.set(true);
+		log.info("The podcast archive has been written to "
 				+ event.getSource().getAbsolutePath());
 	}
 

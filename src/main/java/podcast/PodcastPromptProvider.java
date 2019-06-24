@@ -5,74 +5,60 @@ import org.jline.utils.AttributedStyle;
 import org.springframework.context.event.EventListener;
 import org.springframework.shell.jline.PromptProvider;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
-import java.io.File;
-import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Component
 class PodcastPromptProvider implements PromptProvider {
 
-	private Podcast podcast;
+	private final AtomicReference<String> status = new AtomicReference<>("");
 
-	private File introduction;
+	private final String introductionFileAddedMessage = "Introduction media added";
 
-	private File interview;
+	private final String interviewFileAddedMessage = "An interview media file has been specified UID %s";
 
-	@Override
-	public AttributedString getPrompt() {
+	private final String podcastProductionHasStartedMessage = "The podcast production process has started for UID %s";
 
-		String promptTerminal = " :>";
+	private final String podcastCreatedEventMessage = "A podcast has been initialized";
 
-		if (podcast != null) {
-			return new AttributedString(this.buildPromptForPodcast() + promptTerminal,
-					AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW));
-		}
-		else {
-			return new AttributedString("(no podcast created yet) " + promptTerminal,
-					AttributedStyle.DEFAULT.foreground(AttributedStyle.RED));
-		}
-	}
+	private final String podcastProducedMessage = "A podcast has been produced at URI %s";
 
 	@EventListener
-	public void handle(IntroductionFileEvent event) {
-		this.introduction = event.getSource();
+	void handle(PodcastCreatedEvent event) {
+		this.status.set(status(this.podcastCreatedEventMessage));
+
 	}
 
-	@EventListener
-	public void handle(InterviewFileEvent event) {
-		this.interview = event.getSource();
-	}
-
-	@EventListener
-	public void handle(PodcastStartedEvent event) {
-		this.podcast = event.getSource();
-	}
-
-	private String buildPromptForPodcast() {
-		String introductionLabel = "introduction: ", interviewLabel = "interview: ";
-		String msg = "";
-		if (podcast != null) {
-			msg = podcast.getDescription() + " ";
-			var list = new ArrayList<String>();
-
-			addLabeledFileToPrompt(introductionLabel, list, this.introduction);
-			addLabeledFileToPrompt(interviewLabel, list, this.interview);
-
-			if (list.size() > 0) {
-				var strings = list.toArray(new String[0]);
-				var filesString = StringUtils.arrayToDelimitedString(strings, ", ");
-				msg += "( " + filesString + " )";
-			}
-		}
+	private String status(String msg) {
+		System.out.println(msg);
 		return msg;
 	}
 
-	private static void addLabeledFileToPrompt(String introductionLabel,
-			ArrayList<String> list, File introduction) {
-		if (null != introduction) {
-			list.add(introductionLabel + introduction.getName());
-		}
+	@EventListener
+	void handle(IntroductionFileEvent event) {
+		this.status.set(status(this.introductionFileAddedMessage));
+	}
+
+	@EventListener
+	void handle(InterviewFileEvent event) {
+		this.status.set(status(this.interviewFileAddedMessage));
+	}
+
+	@EventListener
+	void handle(ProductionStartedEvent pse) {
+		this.status.set(status(this.podcastProductionHasStartedMessage));
+	}
+
+	@EventListener
+	void handle(ProductionFinishedEvent event) {
+		this.status.set(
+				status(String.format(this.podcastProducedMessage, event.getSource())));
+	}
+
+	@Override
+	public AttributedString getPrompt() {
+		return new AttributedString(this.status.get(),
+				AttributedStyle.DEFAULT.foreground(AttributedStyle.RED));
 	}
 
 }

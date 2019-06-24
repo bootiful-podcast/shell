@@ -2,9 +2,9 @@ package podcast;
 
 import org.springframework.context.ApplicationEvent;
 
-class PodcastStartedEvent extends ApplicationEvent {
+class PodcastCreatedEvent extends ApplicationEvent {
 
-	PodcastStartedEvent(Podcast source) {
+	PodcastCreatedEvent(Podcast source) {
 		super(source);
 	}
 
